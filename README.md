@@ -12,6 +12,22 @@
 
 filebrowser provides a file managing interface within a specified directory and it can be used to upload, delete, preview, rename and edit your files. It allows the creation of multiple users and each user can have its own directory. It can be used as a standalone app.
 
+## Unit
+
+filebrowser can be used as a Unit application. It can be built with the `unit` build tag.
+
+Assuming unit is installed:
+
+```sh
+go build -tags unit
+```
+
+or if unit is installed in a non-standard location:
+
+```sh
+CGO_LDFLAGS=-L${HOME}/.unit/lib/ CGO_CFLAGS=-I${HOME}/.unit/include  go build -tags unit
+```
+
 ## Demo
 
 url: https://demo.filebrowser.org/

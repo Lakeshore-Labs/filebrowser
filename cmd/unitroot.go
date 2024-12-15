@@ -1,20 +1,16 @@
-//go:build !unit
+//go:build unit
 
 package cmd
 
 import (
-	"crypto/tls"
 	"errors"
 	"io"
 	"io/fs"
 	"log"
 	"net"
-	"net/http"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"strings"
-	"syscall"
 
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/afero"
@@ -22,6 +18,7 @@ import (
 	"github.com/spf13/pflag"
 	v "github.com/spf13/viper"
 	lumberjack "gopkg.in/natefinch/lumberjack.v2"
+	unit "unit.nginx.org/go"
 
 	"github.com/filebrowser/filebrowser/v2/auth"
 	"github.com/filebrowser/filebrowser/v2/diskcache"
@@ -146,33 +143,6 @@ user created with the credentials from options "username" and "password".`,
 
 		adr := server.Address + ":" + server.Port
 
-		var listener net.Listener
-
-		switch {
-		case server.Socket != "":
-			listener, err = net.Listen("unix", server.Socket)
-			checkErr(err)
-			socketPerm, err := cmd.Flags().GetUint32("socket-perm") //nolint:govet
-			checkErr(err)
-			err = os.Chmod(server.Socket, os.FileMode(socketPerm))
-			checkErr(err)
-		case server.TLSKey != "" && server.TLSCert != "":
-			cer, err := tls.LoadX509KeyPair(server.TLSCert, server.TLSKey) //nolint:govet
-			checkErr(err)
-			listener, err = tls.Listen("tcp", adr, &tls.Config{
-				MinVersion:   tls.VersionTLS12,
-				Certificates: []tls.Certificate{cer}},
-			)
-			checkErr(err)
-		default:
-			listener, err = net.Listen("tcp", adr)
-			checkErr(err)
-		}
-
-		sigc := make(chan os.Signal, 1)
-		signal.Notify(sigc, os.Interrupt, syscall.SIGTERM)
-		go cleanupHandler(listener, sigc)
-
 		assetsFs, err := fs.Sub(frontend.Assets(), "dist")
 		if err != nil {
 			panic(err)
@@ -181,11 +151,9 @@ user created with the credentials from options "username" and "password".`,
 		handler, err := fbhttp.NewHandler(imgSvc, fileCache, d.store, server, assetsFs)
 		checkErr(err)
 
-		defer listener.Close()
-
-		log.Println("Listening on", listener.Addr().String())
+		log.Println("Listening on", adr)
 		//nolint: gosec
-		if err := http.Serve(listener, handler); err != nil {
+		if err := unit.ListenAndServe(adr, handler); err != nil {
 			log.Fatal(err)
 		}
 	}, pythonConfig{allowNoDB: true}),
